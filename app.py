@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+from flask_cors import CORS
+CORS(app)
+
 # ─────────────────────────────────────────
 # Factor 3: Config — read from environment variables
 # Never hardcode these values!
