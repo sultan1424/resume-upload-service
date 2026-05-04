@@ -1,14 +1,3 @@
-# ─────────────────────────────────────────
-# Factor 5: Build, Release, Run
-# Factor 1: Codebase — one pipeline per service
-#
-# This pipeline runs automatically on every
-# push to the main branch:
-# 1. BUILD   → builds Docker image
-# 2. RELEASE → pushes image to ECR
-# 3. RUN     → deploys to ECS Fargate
-# ─────────────────────────────────────────
-
 name: Deploy Upload Service
 
 on:
@@ -29,12 +18,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1 — checkout the code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Step 2 — authenticate with AWS
-      # Credentials stored as GitHub Secrets (Factor 3 + Factor 15)
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -42,12 +28,10 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region:            ${{ env.AWS_REGION }}
 
-      # Step 3 — login to ECR
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # Step 4 — BUILD the Docker image and push to ECR
       - name: Build and push Docker image
         id: build-image
         env:
@@ -55,10 +39,11 @@ jobs:
           IMAGE_TAG:     ${{ github.sha }}
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:latest" >> $GITHUB_OUTPUT
 
-      # Step 5 — update ECS task definition with new image
       - name: Update ECS task definition
         id: task-def
         uses: aws-actions/amazon-ecs-render-task-definition@v1
@@ -67,7 +52,6 @@ jobs:
           container-name:          ${{ env.CONTAINER_NAME }}
           image:                   ${{ steps.build-image.outputs.image }}
 
-      # Step 6 — DEPLOY to ECS Fargate (RUN)
       - name: Deploy to ECS
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
